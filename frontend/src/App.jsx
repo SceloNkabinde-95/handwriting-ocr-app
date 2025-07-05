@@ -1,65 +1,94 @@
-import React, { useState } from 'react'
-import axios from 'axios'
-import jsPDF from 'jspdf'
+import React, { useState } from "react";
+import axios from "axios";
 
-export default function App() {
-  const [file, setFile] = useState(null)
-  const [text, setText] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+function App() {
+  const [file, setFile] = useState(null);
+  const [ocrText, setOcrText] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
 
   const handleFileChange = (e) => {
-    setFile(e.target.files[0])
-  }
+    setFile(e.target.files[0]);
+    setOcrText("");
+    setErrorMsg("");
+  };
 
   const handleUpload = async () => {
-    if (!file) return
-    setLoading(true)
-    setError('')
-    const formData = new FormData()
-    formData.append('file', file)
+    if (!file) {
+      alert("Please select a file first.");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
 
     try {
-      const res = await axios.post('http://localhost:8000/ocr', formData)
-      setText(res.data.text)
-    } catch (err) {
-      console.error(err)
-      setError('Failed to process file.')
-    } finally {
-      setLoading(false)
-    }
-  }
+      setLoading(true);
+      setErrorMsg("");
+      const response = await axios.post("http://localhost:8000/ocr", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
 
-  const handleDownload = () => {
-    const pdf = new jsPDF()
-    pdf.text(text, 10, 10)
-    pdf.save('handwritten_text.pdf')
-  }
+      if (response.data?.text) {
+        setOcrText(response.data.text);
+      } else {
+        setErrorMsg("No text was recognized.");
+      }
+    } catch (err) {
+      console.error(err);
+      setErrorMsg("An error occurred during OCR.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <div style={{ padding: '2rem', fontFamily: 'Arial' }}>
-      <h1>📝 Handwriting OCR</h1>
-
-      <input type="file" accept=".jpg,.jpeg,.png,.pdf" onChange={handleFileChange} />
+    <div style={styles.container}>
+      <h1>📝 Handwriting OCR with Azure</h1>
+      <input type="file" accept="image/*" onChange={handleFileChange} />
       <button onClick={handleUpload} disabled={loading}>
-        {loading ? 'Processing...' : 'Upload & Extract Text'}
+        {loading ? "⏳ Processing..." : "📤 Upload & OCR"}
       </button>
 
-      {error && <p style={{ color: 'red' }}>{error}</p>}
-
-      {text && (
-        <>
-          <h2>Recognized Text</h2>
-          <textarea
-            rows="10"
-            cols="60"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-          />
-          <br />
-          <button onClick={handleDownload}>Download PDF</button>
-        </>
-      )}
+      {errorMsg && <p style={styles.error}>{errorMsg}</p>}
+      {ocrText && (
+  <div style={styles.outputBox}>
+    <h3>📝 Editable Recognized Text</h3>
+    <textarea
+      value={ocrText}
+      onChange={(e) => setOcrText(e.target.value)}
+      style={styles.textarea}
+      rows={10}
+    />
+  </div>
+)}
     </div>
-  )
+  );
 }
+
+const styles = {
+  container: {
+    maxWidth: "600px",
+    margin: "auto",
+    padding: "2rem",
+    fontFamily: "Arial, sans-serif",
+    textAlign: "center",
+  },
+  outputBox: {
+    marginTop: "2rem",
+    padding: "1rem",
+    backgroundColor: "#f8f8f8",
+    border: "1px solid #ddd",
+    borderRadius: "8px",
+    whiteSpace: "pre-wrap",
+    textAlign: "left",
+  },
+  error: {
+    color: "red",
+    marginTop: "1rem",
+  },
+};
+
+export default App;
